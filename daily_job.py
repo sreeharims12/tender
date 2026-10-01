@@ -68,10 +68,14 @@ def run_single_cycle(dry_run: bool = False, include_existing: bool = False, cycl
     relevant_tenders = summary.get("relevant_it_tenders", [])
     relevant_count = len(relevant_tenders)
 
+    expired_filtered = summary.get("expired_it_tenders_filtered", 0)
+
     print("--------------------------------------------------")
     print(f"Total tenders scraped: {total_scraped}")
     print(f"Duplicates removed: {duplicates}")
-    print(f"New Relevant IT tenders: {relevant_count}")
+    if expired_filtered > 0:
+        print(f"Expired IT tenders filtered out: {expired_filtered}")
+    print(f"Active New Relevant IT tenders: {relevant_count}")
     print("--------------------------------------------------\n")
 
     print("Generating email...")

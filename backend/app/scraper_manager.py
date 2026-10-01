@@ -17,6 +17,7 @@ try:
     from backend.app.scrapers.sidco import SidcoScraper
     from backend.app.scrapers.kdisc import KDISCScraper
     from backend.app.classifier import classify_tender
+    from backend.app.date_utils import is_tender_active
 except ImportError:
     from app.database import SessionLocal
     from app.models import Tender
@@ -28,6 +29,7 @@ except ImportError:
     from app.scrapers.sidco import SidcoScraper
     from app.scrapers.kdisc import KDISCScraper
     from app.classifier import classify_tender
+    from app.date_utils import is_tender_active
 
 
 logger = logging.getLogger("scraper_manager")
@@ -434,18 +436,27 @@ class ScraperManager:
                 "message": f"Scraping completed. Found {total_scraped} tenders ({self.it_tenders} software-related).",
             })
 
-            # Relevant tenders are strictly those NOT yet emailed
-            relevant = new_it_tenders
-            if include_existing_if_none and len(new_it_tenders) == 0:
-                relevant = all_active_it_tenders
+            # Relevant tenders are strictly those NOT yet emailed AND NOT expired
+            active_relevant = [
+                t for t in new_it_tenders
+                if is_tender_active(t.get("closing_date"), t.get("published_date"))
+            ]
+            expired_filtered_count = len(new_it_tenders) - len(active_relevant)
+
+            if include_existing_if_none and len(active_relevant) == 0:
+                active_relevant = [
+                    t for t in all_active_it_tenders
+                    if is_tender_active(t.get("closing_date"), t.get("published_date"))
+                ]
 
             return {
                 "sources_checked": sources_checked,
                 "tenders_found": total_scraped,
                 "duplicates": duplicates_count,
                 "new_tenders": new_tenders_count,
-                "relevant_it_tenders": relevant,
-                "new_it_tenders": new_it_tenders,
+                "expired_it_tenders_filtered": expired_filtered_count,
+                "relevant_it_tenders": active_relevant,
+                "new_it_tenders": active_relevant,
                 "all_active_it_tenders": all_active_it_tenders,
                 "errors": errors_count,
             }
