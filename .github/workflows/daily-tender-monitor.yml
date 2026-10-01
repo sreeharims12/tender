@@ -1,0 +1,66 @@
+name: Daily Tender Monitor
+
+on:
+  schedule:
+    # 08:00 AM India Standard Time (IST, UTC+5:30) is 02:30 AM UTC
+    # Cron format: minute hour day month day-of-week (in UTC)
+    - cron: '30 2 * * *'
+
+  # Allows manual execution from GitHub -> Actions -> Daily Tender Monitor -> Run workflow
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (Scrape and generate email without sending via Brevo)'
+        required: false
+        default: false
+        type: boolean
+      include_existing:
+        description: 'Include active IT tenders if no new tenders were found today'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  tender-monitor:
+    name: Run Daily Tender Scraper & Notification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      # Restores previous SQLite database to maintain deduplication history across runs
+      - name: Restore SQLite Database Cache
+        uses: actions/cache@v4
+        with:
+          path: backend/tenders.db
+          key: tenders-db-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            tenders-db-${{ runner.os }}-
+
+      - name: Run Daily Tender Job
+        env:
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          if [ "${{ github.event.inputs.include_existing }}" = "true" ]; then
+            ARGS="$ARGS --include-existing"
+          fi
+          python daily_job.py $ARGS
