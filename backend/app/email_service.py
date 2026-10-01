@@ -229,7 +229,7 @@ def generate_email_content(
         <!-- Footer -->
         <div style="background-color: #f1f5f9; padding: 14px 24px; font-size: 11px; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0;">
             This email was generated automatically by GitHub Actions using the Kerala IT Tender Monitoring System.<br>
-            Delivered via Brevo Transactional Email API.
+            Sent directly via automated email notification.
         </div>
     </div>
 </body>
@@ -242,6 +242,83 @@ def generate_email_content(
         "html": html_content,
         "total_count": str(total_count),
     }
+
+
+def send_email_via_gmail_smtp(
+    subject: str,
+    html_content: str,
+    text_content: str,
+    to_email: Optional[str] = None,
+    from_email: Optional[str] = None,
+    app_password: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Sends email directly through Gmail SMTP server (smtp.gmail.com:587)
+    using TLS and a Google App Password.
+    Zero external website dependencies, zero IP block issues, lands straight in primary inbox.
+    """
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.utils import formataddr
+
+    from_email = from_email or os.getenv("EMAIL_FROM")
+    to_email = to_email or os.getenv("EMAIL_TO")
+    app_password = app_password or os.getenv("GMAIL_APP_PASSWORD") or os.getenv("SMTP_PASSWORD")
+
+    missing = []
+    if not from_email:
+        missing.append("EMAIL_FROM")
+    if not to_email:
+        missing.append("EMAIL_TO")
+    if not app_password:
+        missing.append("GMAIL_APP_PASSWORD")
+
+    if missing:
+        raise ValueError(
+            f"Missing required email configuration: {', '.join(missing)}. "
+            "Please configure these as environment variables or GitHub Repository Secrets."
+        )
+
+    # Remove any spaces if user pasted 'abcd efgh ijkl mnop'
+    clean_password = app_password.replace(" ", "").strip()
+    clean_from = from_email.strip()
+    recipients = [addr.strip() for addr in to_email.split(",") if addr.strip()]
+
+    if not recipients:
+        raise ValueError("No valid recipient email address specified in EMAIL_TO.")
+
+    # Create MIME message
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = formataddr(("Kerala IT Tender Monitor", clean_from))
+    msg["To"] = ", ".join(recipients)
+
+    part1 = MIMEText(text_content, "plain", "utf-8")
+    part2 = MIMEText(html_content, "html", "utf-8")
+    msg.attach(part1)
+    msg.attach(part2)
+
+    try:
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=30.0) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(clean_from, clean_password)
+            server.sendmail(clean_from, recipients, msg.as_string())
+
+        logger.info(f"Email sent successfully via Gmail SMTP to: {', '.join(recipients)}")
+        return {"status": "success", "recipients": recipients, "provider": "gmail_smtp"}
+
+    except smtplib.SMTPAuthenticationError as auth_err:
+        err_detail = auth_err.smtp_error.decode("utf-8", errors="ignore") if hasattr(auth_err, "smtp_error") else str(auth_err)
+        raise RuntimeError(
+            "Gmail SMTP Authentication failed. Please verify that your GMAIL_APP_PASSWORD "
+            "is the 16-character Google App Password generated from https://myaccount.google.com/apppasswords "
+            f"(Error: {err_detail})"
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Failed to send email via Gmail SMTP: {str(exc)}")
 
 
 def send_email_via_brevo(
@@ -303,7 +380,7 @@ def send_email_via_brevo(
             resp = client.post(url, headers=headers, json=payload)
             if resp.status_code in [200, 201, 202]:
                 data = resp.json()
-                logger.info(f"Email sent successfully. Message ID: {data.get('messageId')}")
+                logger.info(f"Email sent successfully via Brevo. Message ID: {data.get('messageId')}")
                 return data
             else:
                 try:
@@ -314,3 +391,23 @@ def send_email_via_brevo(
                 raise RuntimeError(f"Brevo API error (HTTP {resp.status_code}): {err_msg}")
     except httpx.RequestError as exc:
         raise RuntimeError(f"Failed to connect to Brevo API: {exc}")
+
+
+def send_email(
+    subject: str,
+    html_content: str,
+    text_content: str,
+    to_email: Optional[str] = None,
+    from_email: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Sends email using direct Gmail SMTP (recommended) or Brevo API fallback.
+    """
+    if os.getenv("GMAIL_APP_PASSWORD") or os.getenv("SMTP_PASSWORD"):
+        return send_email_via_gmail_smtp(subject, html_content, text_content, to_email, from_email)
+    elif os.getenv("BREVO_API_KEY"):
+        return send_email_via_brevo(subject, html_content, text_content, to_email, from_email)
+    else:
+        # Default to Gmail SMTP and validate credentials
+        return send_email_via_gmail_smtp(subject, html_content, text_content, to_email, from_email)
+

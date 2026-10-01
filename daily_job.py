@@ -31,11 +31,11 @@ except ImportError:
 try:
     from backend.app.database import engine, Base
     from backend.app.scraper_manager import scraper_manager
-    from backend.app.email_service import generate_email_content, send_email_via_brevo
+    from backend.app.email_service import generate_email_content, send_email
 except ImportError:
     from app.database import engine, Base
     from app.scraper_manager import scraper_manager
-    from app.email_service import generate_email_content, send_email_via_brevo
+    from app.email_service import generate_email_content, send_email
 
 # Configure clean, high-visibility console logging
 logging.basicConfig(
@@ -84,14 +84,14 @@ def run_daily_monitor(dry_run: bool = False, include_existing: bool = False) -> 
         )
         print("Email generated successfully.\n")
 
-        # 4. Send email via Brevo API
+        # 4. Send email (direct Gmail SMTP or Brevo)
         if dry_run:
-            print("[DRY RUN] Skipping actual Brevo email delivery.")
+            print("[DRY RUN] Skipping actual email delivery.")
             print(f"[DRY RUN] Subject: {email_data['subject']}")
             print(f"[DRY RUN] Plain-text preview:\n{email_data['text'][:400]}...")
         else:
             print("Sending email...")
-            send_email_via_brevo(
+            send_email(
                 subject=email_data["subject"],
                 html_content=email_data["html"],
                 text_content=email_data["text"]

@@ -227,15 +227,17 @@ Configure these secrets under **Settings** → **Secrets and variables** → **A
 
 | Secret Name | Description | Example / Format |
 | :--- | :--- | :--- |
-| `BREVO_API_KEY` | Brevo Transactional v3 API Key | `xkeysib-...` |
-| `EMAIL_TO` | Recipient email address(es) (comma-separated for multiple) | `recipient@example.com` |
-| `EMAIL_FROM` | Verified sender email configured in your Brevo account | `sender@yourdomain.com` |
+| `EMAIL_FROM` | Your sender Gmail address | `yourname@gmail.com` |
+| `EMAIL_TO` | Recipient email address(es) (comma-separated for multiple) | `mssreehari143@gmail.com` |
+| `GMAIL_APP_PASSWORD` | 16-character Google App Password (from [Google App Passwords](https://myaccount.google.com/apppasswords)) | `abcd efgh ijkl mnop` |
 | `GEMINI_API_KEY` | Google Gemini API key for semantic edge-case validation | `AIzaSy...` |
+| `BREVO_API_KEY` *(Optional)* | Optional fallback if using Brevo instead of direct Gmail | `xkeysib-...` |
 
 ### Email Generation & Delivery
 
 - **Generation**: [`backend/app/email_service.py`](backend/app/email_service.py) builds both a mobile-responsive, card-styled HTML email and a plain-text fallback. If no new relevant tenders are published that day, a clean notification stating *"No relevant IT/software tenders were found today"* is sent.
-- **Delivery**: Uses Brevo's HTTPS REST API (`POST https://api.brevo.com/v3/smtp/email`) via HTTPX with zero extra SDK bloat.
+- **Delivery**: Uses Python's built-in `smtplib` to connect directly to Google's official mail server (`smtp.gmail.com:587`) using TLS and your Google App Password. No external third-party services required, no IP blocking, and emails land straight in your Primary inbox.
+
 
 ### Database Persistence on GitHub Actions
 
