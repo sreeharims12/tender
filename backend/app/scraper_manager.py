@@ -321,7 +321,7 @@ class ScraperManager:
                         duplicates_count += 1
                         existing.scraped_at = datetime.utcnow()
                         if existing.is_it_related:
-                            all_active_it_tenders.append({
+                            item_dict = {
                                 "id": existing.id,
                                 "title": existing.title,
                                 "organisation": existing.organisation,
@@ -336,9 +336,14 @@ class ScraperManager:
                                 "published_date": existing.published_date,
                                 "closing_date": existing.closing_date,
                                 "is_it_related": True,
+                                "is_emailed": bool(existing.is_emailed),
                                 "relevance_score": existing.relevance_score,
                                 "matched_keywords": existing.keywords_list,
-                            })
+                            }
+                            all_active_it_tenders.append(item_dict)
+                            # Only include if NEVER emailed before
+                            if not existing.is_emailed:
+                                new_it_tenders.append(item_dict)
                         continue
 
                     # New tender: ensure classification
@@ -374,6 +379,7 @@ class ScraperManager:
                         estimated_value=item.get("estimated_value"),
                         tender_type=item.get("tender_type", "Open Tender"),
                         is_it_related=is_it,
+                        is_emailed=False,
                         relevance_score=score,
                         matched_keywords=json.dumps(matched_kws),
                         scraped_at=datetime.utcnow(),
@@ -398,6 +404,7 @@ class ScraperManager:
                         "published_date": item.get("published_date"),
                         "closing_date": item.get("closing_date"),
                         "is_it_related": is_it,
+                        "is_emailed": False,
                         "relevance_score": score,
                         "matched_keywords": matched_kws,
                     }
@@ -427,6 +434,7 @@ class ScraperManager:
                 "message": f"Scraping completed. Found {total_scraped} tenders ({self.it_tenders} software-related).",
             })
 
+            # Relevant tenders are strictly those NOT yet emailed
             relevant = new_it_tenders
             if include_existing_if_none and len(new_it_tenders) == 0:
                 relevant = all_active_it_tenders
@@ -448,6 +456,28 @@ class ScraperManager:
         finally:
             db.close()
 
+    def mark_tenders_as_emailed(self, tender_ids: List[int]):
+        """
+        Marks the specified tender IDs as emailed in the SQLite database
+        so they will NEVER be included in any future email reports.
+        """
+        if not tender_ids:
+            return
+        db = SessionLocal()
+        try:
+            db.query(Tender).filter(Tender.id.in_(tender_ids)).update(
+                {Tender.is_emailed: True, Tender.emailed_at: datetime.utcnow()},
+                synchronize_session=False
+            )
+            db.commit()
+            logger.info(f"Marked {len(tender_ids)} tenders as emailed in database.")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error marking tenders as emailed: {e}")
+        finally:
+            db.close()
+
 
 scraper_manager = ScraperManager()
+
 

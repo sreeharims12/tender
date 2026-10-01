@@ -9,13 +9,18 @@ on:
   # Allows manual execution from GitHub -> Actions -> Daily Tender Monitor -> Run workflow
   workflow_dispatch:
     inputs:
+      test_two_runs:
+        description: 'Run two 5-minute test cycles (Run 1 -> wait 5m -> Run 2 -> Stop)'
+        required: false
+        default: false
+        type: boolean
       dry_run:
-        description: 'Dry run (Scrape and generate email without sending via Brevo)'
+        description: 'Dry run (Scrape and generate email without actually sending)'
         required: false
         default: false
         type: boolean
       include_existing:
-        description: 'Include active IT tenders if no new tenders were found today'
+        description: 'Include active unnotified tenders even if previously seen'
         required: false
         default: false
         type: boolean
@@ -40,7 +45,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
-      # Restores previous SQLite database to maintain deduplication history across runs
+      # Restores previous SQLite database to maintain deduplication and sent-tender history
       - name: Restore SQLite Database Cache
         uses: actions/cache@v4
         with:
@@ -63,5 +68,8 @@ jobs:
           fi
           if [ "${{ github.event.inputs.include_existing }}" = "true" ]; then
             ARGS="$ARGS --include-existing"
+          fi
+          if [ "${{ github.event.inputs.test_two_runs }}" = "true" ]; then
+            ARGS="$ARGS --test-two-runs --delay-seconds 300"
           fi
           python daily_job.py $ARGS

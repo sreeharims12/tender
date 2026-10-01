@@ -37,9 +37,9 @@ def generate_email_content(
     ]
 
     if total_count == 0:
-        text_lines.append("No relevant IT/software tenders were found today.")
+        text_lines.append("No new relevant IT/software tenders were found today (all previously found tenders were already notified).")
     else:
-        text_lines.append(f"Here are today's relevant IT/software tenders.\n\nTotal relevant tenders: {total_count}")
+        text_lines.append(f"Here are the new relevant IT/software tenders discovered since your last report.\n\nTotal new relevant tenders: {total_count}")
         text_lines.append("\n" + "-" * 50 + "\n")
 
         for idx, t in enumerate(relevant_tenders, 1):
@@ -84,17 +84,17 @@ def generate_email_content(
             <span>&bull;</span>
             <span><strong>Duplicates Filtered:</strong> {duplicates}</span>
             <span>&bull;</span>
-            <span><strong>Relevant IT Tenders:</strong> <span style="color: #0284c7; font-weight: 700;">{total_count}</span></span>
+            <span><strong>New IT Tenders:</strong> <span style="color: #0284c7; font-weight: 700;">{total_count}</span></span>
         </div>
         """
 
     if total_count == 0:
         body_content = f"""
         <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 28px; text-align: center; margin-top: 20px;">
-            <div style="font-size: 36px; margin-bottom: 12px;">🔍</div>
-            <h3 style="margin: 0 0 8px 0; color: #1e293b; font-size: 18px;">No relevant IT/software tenders were found today.</h3>
+            <div style="font-size: 36px; margin-bottom: 12px;">✅</div>
+            <h3 style="margin: 0 0 8px 0; color: #1e293b; font-size: 18px;">No new relevant IT/software tenders were found today.</h3>
             <p style="margin: 0; color: #64748b; font-size: 14px; line-height: 1.5;">
-                All monitored Kerala government portals were scanned. All non-IT tenders and previously processed duplicates were filtered out.
+                All 6 monitored government portals were scanned. All non-IT tenders and previously notified tenders were filtered out.
             </p>
         </div>
         """
